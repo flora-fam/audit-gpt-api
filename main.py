@@ -1,34 +1,50 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from sentence_transformers import SentenceTransformer
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+from typing import List, Optional
 from pinecone import Pinecone
+from sentence_transformers import SentenceTransformer
 import os
+
+# === Configuration ===
+PINECONE_API_KEY = "pcsk_65NWJU_JYvrkcTdXm1kmx3jhoQEwEBHjjmeFEdk1jP9PhFkR6YrpZAvQygmggnY6zvxVct"
+INDEX_NAME = "audit-docs-free"
+MODEL_NAME = "all-MiniLM-L6-v2"
+
+# === Initialize ===
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index(INDEX_NAME)
+model = SentenceTransformer(MODEL_NAME)
 
 app = FastAPI()
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class MatchMetadata(BaseModel):
+    doc_type: Optional[str]
+    domain: Optional[str]
+    last_updated: Optional[str]
 
-# Load sentence-transformers model
-model = SentenceTransformer("all-MiniLM-L6-v2")
+class Match(BaseModel):
+    id: str
+    score: float
+    metadata: MatchMetadata
 
-# Connect to Pinecone
-pinecone_api_key = os.getenv("PINECONE_API_KEY")
-pc = Pinecone(api_key=pinecone_api_key)
-index = pc.Index("audit-docs-free")
+class MatchResponse(BaseModel):
+    matches: List[Match]
 
-@app.get("/query")
-def query_pinecone(question: str, namespace: str = "default"):
-    vector = model.encode([question])[0].tolist()
+@app.get("/query", response_model=MatchResponse)
+def query_pinecone(question: str, namespace: Optional[str] = "default", top_k: int = 3):
+    vector = model.encode(question).tolist()
     result = index.query(
         vector=vector,
-        top_k=3,
+        top_k=top_k,
         include_metadata=True,
         namespace=namespace
     )
-    return {"matches": result["matches"]}
+    matches = [
+        Match(
+            id=match["id"],
+            score=match["score"],
+            metadata=MatchMetadata(**match["metadata"])
+        )
+        for match in result["matches"]
+    ]
+    return MatchResponse(matches=matches)
