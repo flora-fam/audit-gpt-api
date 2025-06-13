@@ -6,6 +6,7 @@ import os
 
 app = FastAPI()
 
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,7 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
+# Load sentence-transformers model
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Connect to Pinecone
 pinecone_api_key = os.getenv("PINECONE_API_KEY")
 pc = Pinecone(api_key=pinecone_api_key)
 index = pc.Index("audit-docs-free")
