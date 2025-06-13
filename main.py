@@ -13,7 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
 pinecone_api_key = os.getenv("PINECONE_API_KEY")
 pc = Pinecone(api_key=pinecone_api_key)
 index = pc.Index("audit-docs-free")
